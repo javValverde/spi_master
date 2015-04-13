@@ -17,21 +17,28 @@ module spi_master
   input                                  avs_read,
   output reg [31:0]                      avs_readdata,
   input                                  avs_write,
-  input      [31:0]                      avs_writedata,
-  output reg                             avs_waitrequest
+  input      [31:0]                      avs_writedata
 );
+
+/*###########################################################################*/
 
 reg        start_spi_transfer;
 reg [31:0] spi_data;
 
+/*===========================================================================*/
+
 //always @(*)
 //    stream_out_valid = (stream_in_valid & ~stream_out_endofpacket) | flush_pipe;
+
+/*===========================================================================*/
 
 /* Avalon interface process */
 always @(posedge clk or negedge reset_n)
 begin
   if (!reset_n) begin
     start_spi_transfer <= 1'b0;
+    spi_data           <= 'b0;
+    avs_readdata       <= 'b0;
   end
   else begin
     // Read
@@ -42,7 +49,7 @@ begin
       endcase
     end
     // Write
-    else if (avs_write & !avs_waitrequest) begin
+    else if (avs_write) begin
       case (avs_address)
         0:    start_spi_transfer <= avs_writedata[0];
         1:    spi_data           <= avs_writedata;
@@ -50,6 +57,8 @@ begin
     end
   end
 end
+
+/*===========================================================================*/
 
 `ifdef COCOTB_SIM
   initial begin
