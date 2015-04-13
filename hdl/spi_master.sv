@@ -34,6 +34,7 @@ module spi_master
 
 reg [31:0] slave_select;
 reg [31:0] spi_data;
+reg is_spi_transfer_active;
 
 /* ========================================================================= */
 /* function declarations                                                     */
@@ -45,8 +46,12 @@ reg [31:0] spi_data;
 
 /* ######################################################################### */
 
-//always @(*)
-//    stream_out_valid = (stream_in_valid & ~stream_out_endofpacket) | flush_pipe;
+always @(*)
+begin
+  if (is_spi_transfer_active) begin
+    ss_n[slave_select] = 'b0;
+  end
+end
 
 /*===========================================================================*/
 
@@ -57,6 +62,7 @@ begin
     slave_select <= 'b0;
     spi_data     <= 'b0;
     avs_readdata <= 'b0;
+    ss_n         <= 'b1;
   end
   else begin
     // Read

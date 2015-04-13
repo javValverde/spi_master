@@ -3,6 +3,8 @@
 Test bench for SPI Master
 """
 
+from spi_monitor import SpiMonitor
+
 import cocotb
 
 from cocotb.triggers import Timer, RisingEdge , FallingEdge#, ReadOnly
@@ -63,3 +65,23 @@ def test_avalon(dut):
     spi_data = yield avs.read(1)
 
     assert_equal(spi_data, 0xDEADBEEF, "Wrong avalon access")
+
+# ########################################################################### #
+
+@cocotb.test()
+def test_spi(dut):
+    """
+    Test spi
+    """
+
+    yield init_clock_reset(dut.clk, dut.reset_n)
+
+    # ----------------------------------------------------------------------- #
+
+    avs = AvalonMaster(dut, "avs", dut.clk)
+    spi_monitor = SpiMonitor(dut)
+
+    yield avs.write(0, 0)
+    output = yield spi_monitor.wait_for_recv()
+
+    assert_equal(False, True, "Wrong avalon access")
