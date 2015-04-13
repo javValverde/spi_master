@@ -1,0 +1,4 @@
+*.xml
+*.vcd
+*.pyc
+sim_build
