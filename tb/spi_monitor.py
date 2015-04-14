@@ -18,8 +18,9 @@ class SpiMonitor(Monitor):
         Creates an Image object from the output of the DUT
         """
 
-        while True:
+        yield FallingEdge(self.dut.ss_n)
 
-            yield FallingEdge(self.dut.ss_n)
+        for _ in range(8):
+            yield RisingEdge(self.dut.sclk)
 
-            self._recv("hola")
+        self._recv("done")
