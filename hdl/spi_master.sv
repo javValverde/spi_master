@@ -39,7 +39,8 @@ localparam SPI_CLK_DIV = 2;
 localparam IDLE           = 0;
 localparam START_TRANSFER = 1;
 localparam DATA           = 2;
-localparam END_TRANSFER   = 3;
+localparam END_DATA       = 3;
+localparam END_TRANSFER   = 4;
 
 /* ========================================================================= */
 /* signal declarations                                                       */
@@ -62,20 +63,6 @@ reg [$clog2(END_TRANSFER)-1:0] spi_state;
 /* ========================================================================= */
 /* function declarations                                                     */
 /* ========================================================================= */
-
-task launch_data;
-  begin
-    mosi               <= spi_data_out[spi_data_out_count];
-    spi_data_out_count <= spi_data_out_count + 1;
-  end
-endtask
-
-task latch_data;
-  begin
-    spi_data_in[spi_data_in_count] <= miso;
-    spi_data_in_count              <= spi_data_in_count + 1;
-  end
-endtask
 
 /* ========================================================================= */
 /* Timing constraints for intermediate signals                               */
@@ -117,22 +104,41 @@ begin
 
       DATA: begin
 
-        // Launch or latch data
         if (spi_clk_div_count == (SPI_CLK_DIV-1)) begin
-          if (sclk) begin // Falling edge
-            launch_data();
+          if (sclk) begin
+            //launch_data();
+            mosi               <= spi_data_out[spi_data_out_count];
+            spi_data_out_count <= spi_data_out_count + 1;
           end
 
-          else begin // Rising edge
-            latch_data();
+          else begin
+            //latch_data();
+            spi_data_in[spi_data_in_count] <= miso;
+            spi_data_in_count              <= spi_data_in_count + 1;
+          end
+
+          if (spi_data_out_count == (32-1)) begin
+            spi_state <= END_DATA;
           end
         end
 
-        if (spi_data_out_count == (32-1)) begin
-          spi_state <= END_TRANSFER;
+      end
 
-          spi_clk_active <= 1'b0;
+      /*---------------------------------------------------------------------*/
+
+      END_DATA: begin
+        if (spi_clk_div_count == (SPI_CLK_DIV-1)) begin
+          if (sclk) begin
+            mosi <= spi_data_out[spi_data_out_count];
+          end
+          else begin
+            spi_data_in[spi_data_in_count] <= miso;
+            spi_state <= END_TRANSFER;
+
+            spi_clk_active <= 1'b0;
+          end
         end
+
       end
 
       /*---------------------------------------------------------------------*/
