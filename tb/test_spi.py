@@ -88,7 +88,7 @@ def test_spi(dut):
     yield avs.write(SPI_DATA_OUT_ADDR, 0xDEADBEEF)
     yield avs.write(SLAVE_SELECT_ADDR, 0)
 
-    output = yield spi_monitor.wait_for_recv()
-    print(hex(output))
+    spi_data_out = yield spi_monitor.wait_for_recv()
 
-    assert_equal(False, True, "Wrong avalon access")
+    assert_equal(spi_data_out, 0xDEADBEEF, "Wrong spi_data: %X"
+                 % spi_data_out)

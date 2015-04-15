@@ -28,7 +28,7 @@ class SpiMonitor(Monitor):
 
         yield FallingEdge(self.dut.sclk)
 
-        for i in range(30):
+        for i in range(32):
             yield RisingEdge(self.dut.sclk)
             spi_data_out += (self.dut.mosi.value << i)
 
