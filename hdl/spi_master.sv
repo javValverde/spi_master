@@ -4,6 +4,7 @@ module spi_master
   parameter                              CPOL          = 0
 )
 (
+  // Clk & Reset
   input                                  clk,
   input                                  reset_n,
 
@@ -30,31 +31,51 @@ module spi_master
 /* ========================================================================= */
 
 localparam SLAVE_SELECT_ADDR = 0;
-localparam SPI_DATA_ADDR     = 1;
+localparam SPI_DATA_IN_ADDR  = 1;
+localparam SPI_DATA_OUT_ADDR = 2;
 
 localparam SPI_CLK_DIV = 2;
 
 localparam IDLE           = 0;
-localparam SLAVE_SELECT_1 = 1;
+localparam START_TRANSFER = 1;
 localparam DATA           = 2;
-localparam SLAVE_SELECT_2 = 3;
+localparam END_TRANSFER   = 3;
 
 /* ========================================================================= */
 /* signal declarations                                                       */
 /* ========================================================================= */
 
 reg [31:0] slave_select;
-reg [31:0] spi_data;
+reg [31:0] spi_data_out;
+reg [31:0] spi_data_in;
+reg [$clog2(32)-1:0] spi_data_out_count;
+reg [$clog2(32)-1:0] spi_data_in_count;
+
 reg is_spi_transfer_active;
 reg spi_transfer_start;
 reg spi_clk_active;
-reg spi_clk_div_count;
 
-reg [$clog2(SLAVE_SELECT_2)-1:0] spi_state;
+reg [$clog2(SPI_CLK_DIV)-1:0] spi_clk_div_count;
+
+reg [$clog2(END_TRANSFER)-1:0] spi_state;
 
 /* ========================================================================= */
 /* function declarations                                                     */
 /* ========================================================================= */
+
+task launch_data;
+  begin
+    mosi               <= spi_data_out[spi_data_out_count];
+    spi_data_out_count <= spi_data_out_count + 1;
+  end
+endtask
+
+task latch_data;
+  begin
+    spi_data_in[spi_data_in_count] <= miso;
+    spi_data_in_count              <= spi_data_in_count + 1;
+  end
+endtask
 
 /* ========================================================================= */
 /* Timing constraints for intermediate signals                               */
@@ -66,8 +87,11 @@ reg [$clog2(SLAVE_SELECT_2)-1:0] spi_state;
 always @(posedge clk or negedge reset_n)
 begin
   if (!reset_n) begin
-    ss_n      <= 'b1;
-    spi_state <= IDLE;
+    ss_n               <= 'b1;
+    spi_clk_active     <= 1'b0;
+    spi_data_out_count <= 'b0;
+    spi_data_in_count  <= 'b0;
+    spi_state          <= IDLE;
   end
   else begin
 
@@ -75,29 +99,55 @@ begin
 
       IDLE: begin
         if (spi_transfer_start) begin
-          ss_n[slave_select] <= 1'b0;
+          spi_state <= START_TRANSFER;
 
-          spi_state <= SLAVE_SELECT_1;
+          ss_n[slave_select] <= 1'b0;
         end
       end
 
       /*---------------------------------------------------------------------*/
 
-      SLAVE_SELECT_1: begin
-        spi_clk_active <= 1'b1;
-
+      START_TRANSFER: begin
         spi_state <= DATA;
+
+        spi_clk_active <= 1'b1;
       end
 
       /*---------------------------------------------------------------------*/
 
       DATA: begin
+
+        // Launch or latch data
+        if (spi_clk_div_count == (SPI_CLK_DIV-1)) begin
+          if (sclk) begin // Falling edge
+            launch_data();
+          end
+
+          else begin // Rising edge
+            latch_data();
+          end
+        end
+
+        if (spi_data_out_count == (32-1)) begin
+          spi_state <= END_TRANSFER;
+
+          spi_clk_active <= 1'b0;
+        end
+      end
+
+      /*---------------------------------------------------------------------*/
+
+      END_TRANSFER: begin
+        spi_state <= IDLE;
+
+        ss_n[slave_select] <= 1'b1;
       end
 
       /*---------------------------------------------------------------------*/
 
       default: begin
       end
+
     endcase
   end
 end
@@ -113,12 +163,12 @@ begin
   end
   else begin
     if (spi_clk_active) begin
-      if (spi_clk_div_count == (SPI_CLK_DIV-1)) begin
-        spi_clk_div_count <= 'b0;
-        sclk              <= ~sclk;
+      if (spi_clk_div_count < (SPI_CLK_DIV-1)) begin
+        spi_clk_div_count <= spi_clk_div_count + 1;
       end
       else begin
-        spi_clk_div_count <= spi_clk_div_count + 1;
+        spi_clk_div_count <= 'b0;
+        sclk              <= ~sclk;
       end
     end
   end
@@ -131,7 +181,8 @@ always @(posedge clk or negedge reset_n)
 begin
   if (!reset_n) begin
     slave_select <= 'b0;
-    spi_data     <= 'b0;
+    spi_data_out <= 'b0;
+    spi_data_in  <= 'b0;
   end
   else begin
     spi_transfer_start <= 1'b0;
@@ -140,7 +191,8 @@ begin
     if (avs_read) begin
       case (avs_address)
         SLAVE_SELECT_ADDR : avs_readdata <= slave_select;
-        SPI_DATA_ADDR     : avs_readdata <= spi_data;
+        SPI_DATA_OUT_ADDR : avs_readdata <= spi_data_out;
+        SPI_DATA_IN_ADDR  : avs_readdata <= spi_data_in;
       endcase
     end
 
@@ -151,7 +203,8 @@ begin
           spi_transfer_start <= 1'b1;
           slave_select       <= avs_writedata;
         end
-        SPI_DATA_ADDR     : spi_data     <= avs_writedata;
+        SPI_DATA_OUT_ADDR : spi_data_out <= avs_writedata;
+        SPI_DATA_IN_ADDR  : spi_data_in  <= avs_writedata;
       endcase
     end
   end

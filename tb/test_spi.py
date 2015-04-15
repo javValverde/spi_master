@@ -11,6 +11,10 @@ from cocotb.triggers import Timer, RisingEdge , FallingEdge#, ReadOnly
 from cocotb.drivers.avalon import AvalonMaster
 from cocotb.result import TestFailure
 
+SLAVE_SELECT_ADDR = 0
+SPI_DATA_IN_ADDR = 1
+SPI_DATA_OUT_ADDR = 2
+
 def assert_equal(actual, expected, error_str):
     """
     assert_equal
@@ -61,7 +65,7 @@ def test_avalon(dut):
 
     avs = AvalonMaster(dut, "avs", dut.clk)
 
-    yield avs.write(1, 0xDEADBEEF)
+    yield avs.write(SPI_DATA_IN_ADDR, 0xDEADBEEF)
     spi_data = yield avs.read(1)
 
     assert_equal(spi_data, 0xDEADBEEF, "Wrong avalon access")
@@ -81,7 +85,10 @@ def test_spi(dut):
     avs = AvalonMaster(dut, "avs", dut.clk)
     spi_monitor = SpiMonitor(dut)
 
-    yield avs.write(0, 0)
+    yield avs.write(SPI_DATA_OUT_ADDR, 0xDEADBEEF)
+    yield avs.write(SLAVE_SELECT_ADDR, 0)
+
     output = yield spi_monitor.wait_for_recv()
+    print(hex(output))
 
     assert_equal(False, True, "Wrong avalon access")

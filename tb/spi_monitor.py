@@ -8,6 +8,10 @@ from cocotb.triggers import RisingEdge, FallingEdge
 from cocotb.monitors import Monitor
 
 class SpiMonitor(Monitor):
+    """
+    Spi Monitor class
+    """
+
     def __init__(self, dut, **kwargs):
         self.dut = dut
         Monitor.__init__(self, **kwargs)
@@ -18,9 +22,15 @@ class SpiMonitor(Monitor):
         Creates an Image object from the output of the DUT
         """
 
+        spi_data_out = 0
+
         yield FallingEdge(self.dut.ss_n)
 
-        for _ in range(8):
-            yield RisingEdge(self.dut.sclk)
+        yield FallingEdge(self.dut.sclk)
 
-        self._recv("done")
+        for i in range(30):
+            yield RisingEdge(self.dut.sclk)
+            spi_data_out += (self.dut.mosi.value << i)
+
+
+        self._recv(spi_data_out)
